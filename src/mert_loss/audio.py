@@ -48,20 +48,12 @@ def resample_if_needed(
     return AF.resample(waveform, sample_rate, target_sample_rate)
 
 
-def normalize_waveform(waveform: torch.Tensor) -> torch.Tensor:
+def zero_mean_unit_var_norm(waveform: torch.Tensor) -> torch.Tensor:
+    """Differentiable per-waveform zero-mean unit-variance normalization.
+
+    Mirrors ``Wav2Vec2FeatureExtractor.zero_mean_unit_var_norm`` but stays
+    on GPU and preserves the autograd graph.
+    """
     mean = waveform.mean(dim=-1, keepdim=True)
     var = waveform.var(dim=-1, unbiased=False, keepdim=True)
     return (waveform - mean) / torch.sqrt(var + EPS)
-
-
-def prepare_waveform(
-    waveform: torch.Tensor,
-    sample_rate: int,
-    target_sample_rate: int,
-    normalize: bool = True,
-) -> torch.Tensor:
-    waveform = ensure_batch(waveform)
-    waveform = resample_if_needed(waveform, sample_rate, target_sample_rate)
-    if normalize:
-        waveform = normalize_waveform(waveform)
-    return waveform

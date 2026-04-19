@@ -41,21 +41,26 @@ def get_cached_loss(
     model_name: str = "m-a-p/MERT-v1-95M",
     sample_rate: int = 44_100,
     layers: Union[int, list[int], None] = None,
+    layer_weights: Union[float, list[float], None] = None,
     reduction: str = "mean",
     normalize: bool = True,
     detach_target: bool = True,
     align: str = "truncate",
+    loss_type: str = "cosine",
     device: Optional[torch.device | str] = None,
 ) -> MERTLoss:
     resolved = _normalize_layers(layers)
+    weights_key = tuple(layer_weights) if isinstance(layer_weights, list) else layer_weights
     key = (
         model_name,
         sample_rate,
         tuple(resolved),
+        weights_key,
         reduction,
         normalize,
         detach_target,
         align,
+        loss_type,
         str(device) if device is not None else None,
     )
 
@@ -63,9 +68,11 @@ def get_cached_loss(
         _LOSS_CACHE[key] = MERTLoss(
             sample_rate=sample_rate,
             layers=resolved,
+            layer_weights=layer_weights,
             reduction=reduction,
             detach_target=detach_target,
             align=align,
+            loss_type=loss_type,
             encoder=get_cached_encoder(
                 model_name=model_name,
                 layers=resolved,

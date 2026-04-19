@@ -25,6 +25,20 @@ class FakeMERTModel(torch.nn.Module):
         return SimpleNamespace(hidden_states=hidden_states)
 
 
+class FakeProcessor:
+    """Minimal Wav2Vec2FeatureExtractor stand-in for tests."""
+    def __call__(self, waveforms, sampling_rate=24000, return_tensors="pt", padding=True):
+        import numpy as np
+        import torch
+        if isinstance(waveforms, np.ndarray):
+            arr = torch.from_numpy(waveforms).float()
+        else:
+            arr = torch.as_tensor(waveforms, dtype=torch.float32)
+        if arr.ndim == 1:
+            arr = arr.unsqueeze(0)
+        return {"input_values": arr}
+
+
 def patch_model(monkeypatch):
     created = []
 
@@ -36,6 +50,10 @@ def patch_model(monkeypatch):
     monkeypatch.setattr(
         "mert_loss.encoder.load_pretrained_model",
         lambda model_name: fake_from_pretrained(),
+    )
+    monkeypatch.setattr(
+        "mert_loss.encoder.load_pretrained_processor",
+        lambda model_name: FakeProcessor(),
     )
     return created
 
@@ -180,3 +198,41 @@ def test_multi_layer_perturbed_is_positive(monkeypatch):
     loss = loss_fn(y, x)
 
     assert loss > 0
+
+
+# --- layer_weights tests ---
+
+
+def test_layer_weights_backward_flows_to_pred(monkeypatch):
+    patch_model(monkeypatch)
+
+    loss_fn = MERTLoss(
+        sample_rate=24_000,
+        layers=[6, 7, 8, 9],
+        layer_weights=[1.0, 0.5, 0.5, 1.0],
+        loss_type="l1",
+    )
+    pred = torch.randn(2, 1000, requires_grad=True)
+    target = torch.randn(2, 1000)
+
+    loss = loss_fn(pred, target)
+    loss.backward()
+
+    assert loss.ndim == 0
+    assert pred.grad is not None
+    assert torch.isfinite(pred.grad).all()
+
+
+def test_layer_weights_identical_has_zero_loss(monkeypatch):
+    patch_model(monkeypatch)
+
+    x = torch.randn(1, 1000)
+    loss_fn = MERTLoss(
+        sample_rate=24_000,
+        layers=[6, 8, 10],
+        layer_weights=[2.0, 1.0, 0.5],
+        loss_type="l1",
+    )
+    loss = loss_fn(x, x)
+
+    assert torch.isclose(loss, torch.zeros_like(loss), atol=1e-6)

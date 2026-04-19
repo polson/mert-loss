@@ -32,20 +32,24 @@ def mert_loss(
     sample_rate: int = 44_100,
     model_name: str = "m-a-p/MERT-v1-95M",
     layers: Union[int, list[int], None] = None,
+    layer_weights: Union[float, list[float], None] = None,
     reduction: str = "mean",
     normalize: bool = True,
     detach_target: bool = True,
     align: str = "truncate",
+    loss_type: str = "cosine",
     device: Optional[torch.device | str] = "cuda",
 ) -> torch.Tensor:
     loss_fn = get_cached_loss(
         model_name=model_name,
         sample_rate=sample_rate,
         layers=layers,
+        layer_weights=layer_weights,
         reduction=reduction,
         normalize=normalize,
         detach_target=detach_target,
         align=align,
+        loss_type=loss_type,
         device=device,
     )
     return loss_fn(pred, target)
@@ -58,10 +62,12 @@ def mert_perceptual_loss(
     sample_rate: int = 44_100,
     model_name: str = "m-a-p/MERT-v1-95M",
     layers: Union[int, list[int], None] = None,
+    layer_weights: Union[float, list[float], None] = None,
     reduction: str = "mean",
     normalize: bool = True,
     detach_target: bool = True,
     align: str = "truncate",
+    loss_type: str = "cosine",
     device: Optional[torch.device | str] = "cuda",
 ) -> torch.Tensor:
     return mert_loss(
@@ -70,9 +76,11 @@ def mert_perceptual_loss(
         sample_rate=sample_rate,
         model_name=model_name,
         layers=layers,
+        layer_weights=layer_weights,
         reduction=reduction,
         normalize=normalize,
         detach_target=detach_target,
         align=align,
+        loss_type=loss_type,
         device=device,
     )
